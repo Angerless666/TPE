@@ -18,11 +18,16 @@
     table{width:100%;border-collapse:collapse;margin-top:10px}
     th,td{padding:8px;border-bottom:1px solid #f0f0f0;text-align:left}
     .muted{margin-left:10px;color:#666;font-size:13px}
+    #connStatus{margin-bottom:10px;font-size:13px}
+    #connStatus.ok{color:#008000}
+    #connStatus.err{color:#b00020}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Equipment Admin</h1>
+
+    <div id="connStatus" class="muted">Checking CloudKit connection…</div>
 
     <div id="auth" class="card">
       <button id="signinBtn">Sign In (optional)</button>
@@ -56,7 +61,7 @@
 
     <div class="card">
       <h3>Equipment Models</h3>
-      <button id="refreshBtn">Refresh List</button>
+      <button id="refreshBtn" type="button">Refresh List</button>
       <table id="equipTable">
         <thead><tr><th>Name</th><th>SKU</th><th>Total</th><th>Location</th></tr></thead>
         <tbody></tbody>
@@ -65,12 +70,13 @@
   </div>
 
 <script>
+/* CLOUDKIT CONFIG */
 const containerConfig = {
   containerIdentifier: 'iCloud.com.TPevents.inventory',
   environment: 'development',
   apiToken: {
     environment: 'development',
-    name: 'testconnection1'
+    name: 'testconnection1'   // API Token NAME
   }
 };
 
@@ -82,13 +88,33 @@ const db = container.publicCloudDatabase;
 const signinBtn = document.getElementById('signinBtn');
 const signoutBtn = document.getElementById('signoutBtn');
 const userInfo = document.getElementById('userInfo');
+const connStatus = document.getElementById('connStatus');
 const createEquipForm = document.getElementById('createEquipForm');
 const allocateForm = document.getElementById('allocateForm');
 const equipSelect = document.getElementById('equip_select');
 const equipTableBody = document.querySelector('#equipTable tbody');
 const refreshBtn = document.getElementById('refreshBtn');
 
-/* Auth (optional) */
+/* ---- CONNECTION TEST ---- */
+async function testConnection() {
+  try {
+    const result = await db.performQuery({
+      recordType: 'EquipmentModel',
+      resultsLimit: 1
+    });
+    connStatus.textContent = 'CloudKit connection OK.';
+    connStatus.classList.remove('err');
+    connStatus.classList.add('ok');
+    console.log('CloudKit test result:', result);
+  } catch (e) {
+    connStatus.textContent = 'CloudKit connection FAILED: ' + e;
+    connStatus.classList.remove('ok');
+    connStatus.classList.add('err');
+    console.error('CloudKit connection error:', e);
+  }
+}
+
+/* ---- AUTH (optional) ---- */
 signinBtn.addEventListener('click', async () => {
   try { await container.signIn(); updateAuthUI(); } catch (e){ alert('Sign in failed: ' + e); }
 });
@@ -107,7 +133,7 @@ function updateAuthUI(){
   }
 }
 
-/* Create one record using saveRecords */
+/* ---- SAVE HELPER (uses saveRecords, not .save) ---- */
 async function createRecord(recordType, fields){
   const res = await db.saveRecords({
     records: [{ recordType, fields }]
@@ -116,7 +142,7 @@ async function createRecord(recordType, fields){
   throw new Error('Create failed');
 }
 
-/* Create EquipmentModel */
+/* ---- CREATE EQUIPMENT MODEL ---- */
 createEquipForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -151,7 +177,7 @@ createEquipForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* Allocate equipment */
+/* ---- ALLOCATE EQUIPMENT ---- */
 allocateForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -199,7 +225,7 @@ allocateForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* Load equipment list using performQuery */
+/* ---- LOAD EQUIPMENT LIST ---- */
 async function loadEquipmentList(){
   try {
     equipTableBody.innerHTML = '';
@@ -241,9 +267,10 @@ function escapeHtml(s){
 
 refreshBtn.addEventListener('click', loadEquipmentList);
 
-/* Init */
+/* ---- INIT ---- */
 updateAuthUI();
-loadEquipmentList();
+testConnection();      // verify CloudKit connection on load
+loadEquipmentList();   // populate initial list
 </script>
 </body>
 </html>
