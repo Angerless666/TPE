@@ -1,38 +1,248 @@
-<div id="auth" class="card">
-  <button id="signinBtn">Sign In (optional)</button>
-  <button id="signoutBtn" style="display:none">Sign Out</button>
-  <span id="userInfo" class="muted"></span>
-</div>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Equipment Admin — TPevents</title>
+  <script src="https://cdn.apple-cloudkit.com/ck/2/cloudkit.js"></script>
+  <style>
+    body{font-family:Inter,Helvetica,Arial,sans-serif;background:#f7f8fb;margin:20px}
+    .wrap{max-width:900px;margin:0 auto}
+    .card{background:#fff;padding:14px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}
+    h1{margin:0 0 12px}
+    label{display:block;margin:8px 0 4px;font-size:13px}
+    input,textarea,select{width:100%;padding:8px;border:1px solid #e3e6ea;border-radius:4px;font-size:14px}
+    textarea{min-height:60px}
+    button{background:#0b5fff;color:#fff;border:0;padding:8px 12px;border-radius:5px;cursor:pointer}
+    .row{display:flex;gap:12px}
+    .col{flex:1}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;border-bottom:1px solid #f0f0f0;text-align:left}
+    .muted{margin-left:10px;color:#666;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Equipment Admin</h1>
 
-<form id="createEquipForm" class="card">
-  <h3>Create Equipment Model</h3>
-  <label>Name</label><input id="eq_name" required />
-  <label>Description</label><textarea id="eq_description"></textarea>
-  <div class="row">
-    <div class="col"><label>SKU</label><input id="eq_sku" /></div>
-    <div class="col"><label>Total Quantity</label><input id="eq_total" type="number" min="0" value="0" /></div>
+    <div id="auth" class="card">
+      <button id="signinBtn">Sign In (optional)</button>
+      <button id="signoutBtn" style="display:none">Sign Out</button>
+      <span id="userInfo" class="muted"></span>
+    </div>
+
+    <form id="createEquipForm" class="card">
+      <h3>Create Equipment Model</h3>
+      <label>Name</label><input id="eq_name" required />
+      <label>Description</label><textarea id="eq_description"></textarea>
+      <div class="row">
+        <div class="col"><label>SKU</label><input id="eq_sku" /></div>
+        <div class="col"><label>Total Quantity</label><input id="eq_total" type="number" min="0" value="0" /></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Unit Weight (kg)</label><input id="eq_weight" type="number" step="any" /></div>
+        <div class="col"><label>Unit Volume (m3)</label><input id="eq_volume" type="number" step="any" /></div>
+      </div>
+      <label>Location</label><input id="eq_location" />
+      <button type="submit">Create Equipment</button>
+    </form>
+
+    <form id="allocateForm" class="card">
+      <h3>Allocate Equipment to Project</h3>
+      <label>Project Record Name/ID (Project._recordName)</label><input id="proj_id" required />
+      <label>Equipment Model</label><select id="equip_select"></select>
+      <label>Quantity</label><input id="alloc_qty" type="number" min="1" value="1" />
+      <button type="submit">Allocate</button>
+    </form>
+
+    <div class="card">
+      <h3>Equipment Models</h3>
+      <button id="refreshBtn">Refresh List</button>
+      <table id="equipTable">
+        <thead><tr><th>Name</th><th>SKU</th><th>Total</th><th>Location</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
-  <div class="row">
-    <div class="col"><label>Unit Weight (kg)</label><input id="eq_weight" type="number" step="any" /></div>
-    <div class="col"><label>Unit Volume (m3)</label><input id="eq_volume" type="number" step="any" /></div>
-  </div>
-  <label>Location</label><input id="eq_location" />
-  <button type="submit">Create Equipment</button>
-</form>
 
-<form id="allocateForm" class="card">
-  <h3>Allocate Equipment to Project</h3>
-  <label>Project Record Name/ID (Project._recordName)</label><input id="proj_id" required />
-  <label>Equipment Model</label><select id="equip_select"></select>
-  <label>Quantity</label><input id="alloc_qty" type="number" min="1" value="1" />
-  <button type="submit">Allocate</button>
-</form>
+<script>
+/* CLOUDKIT CONNECTION INFO:
+   - containerIdentifier: your CloudKit container
+   - environment: 'development' (must match token)
+   - apiToken.name: API Token NAME from CloudKit Dashboard (NOT the secret key)
+*/
+const containerConfig = {
+  containerIdentifier: 'iCloud.com.TPevents.inventory',
+  environment: 'development',
+  apiToken: {
+    environment: 'development',
+    name: 'testconnection1'   // <-- API token NAME you created
+  }
+};
 
-<div class="card">
-  <h3>Equipment Models</h3>
-  <button id="refreshBtn">Refresh List</button>
-  <table id="equipTable">
-    <thead><tr><th>Name</th><th>SKU</th><th>Total</th><th>Location</th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
+CloudKit.configure({ containers: [containerConfig] });
+const container = CloudKit.getDefaultContainer();
+
+/* UI refs */
+const signinBtn = document.getElementById('signinBtn');
+const signoutBtn = document.getElementById('signoutBtn');
+const userInfo = document.getElementById('userInfo');
+const createEquipForm = document.getElementById('createEquipForm');
+const allocateForm = document.getElementById('allocateForm');
+const equipSelect = document.getElementById('equip_select');
+const equipTableBody = document.querySelector('#equipTable tbody');
+const refreshBtn = document.getElementById('refreshBtn');
+
+/* Auth (optional) */
+signinBtn.addEventListener('click', async () => {
+  try { await container.signIn(); updateAuthUI(); } catch (e){ alert('Sign in failed: ' + e); }
+});
+signoutBtn.addEventListener('click', async () => { await container.signOut(); updateAuthUI(); });
+
+function updateAuthUI(){
+  if(container.getUserToken()){
+    signinBtn.style.display='none';
+    signoutBtn.style.display='inline-block';
+    const u = container.getUserInfo();
+    userInfo.textContent = u ? `Signed in: ${u.userRecordName}` : '';
+  } else {
+    signinBtn.style.display='inline-block';
+    signoutBtn.style.display='none';
+    userInfo.textContent = '';
+  }
+}
+
+/* Helper to create a record */
+async function createRecord(recordType, fields){
+  const record = { recordType, fields };
+  const res = await container.publicCloudDatabase.save(record);
+  if(res && res.records && res.records.length) return res.records[0];
+  throw new Error('Create failed');
+}
+
+/* Create EquipmentModel */
+createEquipForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const now = new Date().toISOString();
+    const rec = {
+      name: document.getElementById('eq_name').value || '',
+      description: document.getElementById('eq_description').value || '',
+      sku: document.getElementById('eq_sku').value || '',
+      total_quantity: parseInt(document.getElementById('eq_total').value || '0',10),
+      unit_weight_kg: parseFloat(document.getElementById('eq_weight').value) || null,
+      unit_volume_m3: parseFloat(document.getElementById('eq_volume').value) || null,
+      location: document.getElementById('eq_location').value || '',
+      createdAt: now,
+      updatedAt: now
+    };
+    const created = await createRecord('EquipmentModel', rec);
+
+    await createRecord('AuditLog', {
+      action: 'create',
+      entity: 'EquipmentModel',
+      entity_id: created.recordName,
+      details: `Created equipment ${rec.name}`,
+      timestamp: now,
+      user: container.getUserInfo() ? container.getUserInfo().userRecordName : null
+    });
+
+    alert('Created: ' + created.recordName);
+    loadEquipmentList();
+    createEquipForm.reset();
+  } catch (err){
+    alert('Error: ' + err);
+  }
+});
+
+/* Allocate equipment to project */
+allocateForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const projectId = document.getElementById('proj_id').value.trim();
+    const equipSelection = equipSelect.value;
+    const qty = parseInt(document.getElementById('alloc_qty').value, 10);
+
+    if(!projectId || !equipSelection || qty <= 0) {
+      alert('All fields required');
+      return;
+    }
+
+    // Optional availability check
+    const fetched = await container.publicCloudDatabase.fetchRecords([equipSelection]);
+    const eq = (fetched.records && fetched.records[0]) || null;
+    if(eq && typeof eq.fields.total_quantity === 'number' && eq.fields.total_quantity < qty){
+      if(!confirm('Quantity exceeds total_quantity. Proceed?')) return;
+    }
+
+    const now = new Date().toISOString();
+    const allocRec = {
+      createdAt: now,
+      created_by: container.getUserInfo() ? container.getUserInfo().userRecordName : null,
+      equipment_model: { recordName: equipSelection },
+      project: { recordName: projectId },
+      quantity: qty,
+      updatedAt: now
+    };
+
+    const created = await createRecord('ProjectAllocation', allocRec);
+
+    await createRecord('AuditLog', {
+      action: 'allocate',
+      entity: 'ProjectAllocation',
+      entity_id: created.recordName,
+      details: `Allocated ${qty} of ${equipSelection} to ${projectId}`,
+      timestamp: now,
+      user: container.getUserInfo() ? container.getUserInfo().userRecordName : null
+    });
+
+    alert('Allocation created: ' + created.recordName);
+    allocateForm.reset();
+  } catch (err){
+    alert('Error: ' + err);
+  }
+});
+
+/* Load equipment list */
+async function loadEquipmentList(){
+  try {
+    equipTableBody.innerHTML = '';
+    equipSelect.innerHTML = '';
+
+    const resp = await container.publicCloudDatabase.performQuery({ query: 'SELECT * FROM EquipmentModel' });
+    const records = resp.records || [];
+
+    records.forEach(r=>{
+      const name = r.fields.name || '(no name)';
+      const sku = r.fields.sku || '';
+      const total = r.fields.total_quantity != null ? r.fields.total_quantity : '';
+      const loc = r.fields.location || '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(name)}</td><td>${escapeHtml(sku)}</td><td>${escapeHtml(total)}</td><td>${escapeHtml(loc)}</td>`;
+      equipTableBody.appendChild(tr);
+
+      const opt = document.createElement('option');
+      opt.value = r.recordName;
+      opt.textContent = `${name} (${r.recordName})`;
+      equipSelect.appendChild(opt);
+    });
+  } catch (err){
+    console.error(err);
+    alert('Failed to load equipment: ' + err);
+  }
+}
+
+function escapeHtml(s){
+  return (''+s).replace(/[&<>"']/g, c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+refreshBtn.addEventListener('click', loadEquipmentList);
+
+/* Init */
+updateAuthUI();
+loadEquipmentList();
+</script>
+</body>
+</html>
