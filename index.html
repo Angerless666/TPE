@@ -11,7 +11,6 @@
     h1{margin:0 0 12px}
     label{display:block;margin:8px 0 4px;font-size:13px}
     input,textarea,select{width:100%;padding:8px;border:1px solid #e3e6ea;border-radius:4px;font-size:14px}
-    textarea{min-height:60px}
     button{background:#0b5fff;color:#fff;border:0;padding:8px 12px;border-radius:5px;cursor:pointer}
     .row{display:flex;gap:12px}
     .col{flex:1}
@@ -29,47 +28,64 @@
 
     <div id="connStatus" class="muted">Checking CloudKit connection…</div>
 
+    <!-- Create Equipment (maps to record type Equipment) -->
     <form id="createEquipForm" class="card">
-      <h3>Create Equipment Model</h3>
-      <label>Name</label><input id="eq_name" required />
-      <label>Description</label><textarea id="eq_description"></textarea>
+      <h3>Adaugă echipament (RECORD TYPE: Equipment)</h3>
       <div class="row">
-        <div class="col"><label>SKU</label><input id="eq_sku" /></div>
-        <div class="col"><label>Total Quantity</label><input id="eq_total" type="number" min="0" value="0" /></div>
+        <div class="col">
+          <label>Nume (Nume)</label>
+          <input id="eq_nume" required />
+        </div>
+        <div class="col">
+          <label>Id (Id – identificator intern)</label>
+          <input id="eq_id" required />
+        </div>
       </div>
       <div class="row">
-        <div class="col"><label>Unit Weight (kg)</label><input id="eq_weight" type="number" step="any" /></div>
-        <div class="col"><label>Unit Volume (m3)</label><input id="eq_volume" type="number" step="any" /></div>
+        <div class="col">
+          <label>Cantitate (Cantitate)</label>
+          <input id="eq_cantitate" type="number" min="0" value="0" />
+        </div>
+        <div class="col">
+          <label>Greutate (Greutate, kg)</label>
+          <input id="eq_greutate" type="number" step="any" />
+        </div>
       </div>
-      <label>Location</label><input id="eq_location" />
-      <button type="submit">Create Equipment</button>
+      <div class="row">
+        <div class="col">
+          <label>Volum (Volum, m³)</label>
+          <input id="eq_volum" type="number" step="any" />
+        </div>
+      </div>
+      <button type="submit">Salvează echipament</button>
     </form>
 
-    <form id="allocateForm" class="card">
-      <h3>Allocate Equipment to Project</h3>
-      <label>Project Record Name/ID (Project._recordName)</label><input id="proj_id" required />
-      <label>Equipment Model</label><select id="equip_select"></select>
-      <label>Quantity</label><input id="alloc_qty" type="number" min="1" value="1" />
-      <button type="submit">Allocate</button>
-    </form>
-
+    <!-- List Equipment -->
     <div class="card">
-      <h3>Equipment Models</h3>
-      <button id="refreshBtn" type="button">Refresh List</button>
+      <h3>Lista echipament (Equipment)</h3>
+      <button id="refreshBtn" type="button">Reîncarcă lista</button>
       <table id="equipTable">
-        <thead><tr><th>Name</th><th>SKU</th><th>Total</th><th>Location</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Nume</th>
+            <th>Id</th>
+            <th>Cantitate</th>
+            <th>Greutate</th>
+            <th>Volum</th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </div>
   </div>
 
 <script>
-/* CLOUDKIT CONFIG: use API Access token string via apiTokenAuth.apiToken */
+/* CLOUDKIT CONFIG: using API Access token string via apiTokenAuth.apiToken */
 CloudKit.configure({
   containers: [{
     containerIdentifier: 'iCloud.com.TPevents.inventory',
     apiTokenAuth: {
-      apiToken: 'fd25015fd2080cc274066ae6b7c7e6cc7d5954e2c24f6f6d2d0a2a83deba51f6',
+      apiToken: '8b5f292d85a49134272e27c90b5ba7921dcebed86d915e99e1a467ebe7ec7e87',
       persist: true
     },
     environment: 'development'
@@ -82,16 +98,14 @@ const db = container.publicCloudDatabase;
 /* UI refs */
 const connStatus = document.getElementById('connStatus');
 const createEquipForm = document.getElementById('createEquipForm');
-const allocateForm = document.getElementById('allocateForm');
-const equipSelect = document.getElementById('equip_select');
 const equipTableBody = document.querySelector('#equipTable tbody');
 const refreshBtn = document.getElementById('refreshBtn');
 
-/* CONNECTION TEST */
+/* CONNECTION TEST: query Equipment (uses Id as queryable index) */
 async function testConnection() {
   try {
     const result = await db.performQuery({
-      recordType: 'EquipmentModel',
+      recordType: 'Equipment',
       resultsLimit: 1
     });
     connStatus.textContent = 'CloudKit connection OK.';
@@ -106,7 +120,7 @@ async function testConnection() {
   }
 }
 
-/* SAVE HELPER */
+/* SAVE HELPER: create one Equipment record */
 async function createRecord(recordType, fields){
   const res = await db.saveRecords({
     records: [{ recordType, fields }]
@@ -115,119 +129,65 @@ async function createRecord(recordType, fields){
   throw new Error('Create failed');
 }
 
-/* CREATE EQUIPMENT MODEL */
+/* CREATE Equipment (fields: Cantitate, Greutate, Id, Nume, Volum) */
 createEquipForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
-    const now = new Date().toISOString();
-    const rec = {
-      name: document.getElementById('eq_name').value || '',
-      description: document.getElementById('eq_description').value || '',
-      sku: document.getElementById('eq_sku').value || '',
-      total_quantity: parseInt(document.getElementById('eq_total').value || '0',10),
-      unit_weight_kg: parseFloat(document.getElementById('eq_weight').value) || null,
-      unit_volume_m3: parseFloat(document.getElementById('eq_volume').value) || null,
-      location: document.getElementById('eq_location').value || '',
-      createdAt: now,
-      updatedAt: now
+    const nume = document.getElementById('eq_nume').value || '';
+    const id   = document.getElementById('eq_id').value || '';
+    const cant = parseInt(document.getElementById('eq_cantitate').value || '0', 10);
+    const gre  = parseFloat(document.getElementById('eq_greutate').value) || 0;
+    const vol  = parseFloat(document.getElementById('eq_volum').value) || 0;
+
+    const fields = {
+      Nume: nume,
+      Id: id,                 // STRING QUERYABLE in your schema
+      Cantitate: cant,        // INT64
+      Greutate: gre,          // DOUBLE
+      Volum: vol              // DOUBLE
+      // CloudKit will fill ___createTime etc.
     };
-    const created = await createRecord('EquipmentModel', rec);
 
-    await createRecord('AuditLog', {
-      action: 'create',
-      entity: 'EquipmentModel',
-      entity_id: created.recordName,
-      details: `Created equipment ${rec.name}`,
-      timestamp: now,
-      user: null
-    });
-
-    alert('Created: ' + created.recordName);
+    const created = await createRecord('Equipment', fields);
+    alert('Creat echipament: ' + (created.recordName || '(fără recordName)'));
     loadEquipmentList();
     createEquipForm.reset();
   } catch (err){
-    alert('Error: ' + err);
+    alert('Eroare la creare: ' + err);
   }
 });
 
-/* ALLOCATE EQUIPMENT */
-allocateForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  try {
-    const projectId = document.getElementById('proj_id').value.trim();
-    const equipSelection = equipSelect.value;
-    const qty = parseInt(document.getElementById('alloc_qty').value, 10);
-
-    if(!projectId || !equipSelection || qty <= 0) {
-      alert('All fields required');
-      return;
-    }
-
-    const fetched = await db.fetchRecords({ recordNames: [equipSelection] });
-    const eq = (fetched.records && fetched.records[0]) || null;
-    if(eq && typeof eq.fields.total_quantity === 'number' && eq.fields.total_quantity < qty){
-      if(!confirm('Quantity exceeds total_quantity. Proceed?')) return;
-    }
-
-    const now = new Date().toISOString();
-    const allocRec = {
-      createdAt: now,
-      created_by: null,
-      equipment_model: { recordName: equipSelection },
-      project: { recordName: projectId },
-      quantity: qty,
-      updatedAt: now
-    };
-
-    const created = await createRecord('ProjectAllocation', allocRec);
-
-    await createRecord('AuditLog', {
-      action: 'allocate',
-      entity: 'ProjectAllocation',
-      entity_id: created.recordName,
-      details: `Allocated ${qty} of ${equipSelection} to ${projectId}`,
-      timestamp: now,
-      user: null
-    });
-
-    alert('Allocation created: ' + created.recordName);
-    allocateForm.reset();
-  } catch (err){
-    alert('Error: ' + err);
-  }
-});
-
-/* LOAD EQUIPMENT LIST */
+/* LOAD Equipment list */
 async function loadEquipmentList(){
   try {
     equipTableBody.innerHTML = '';
-    equipSelect.innerHTML = '';
 
     const resp = await db.performQuery({
-      recordType: 'EquipmentModel',
-      sortBy: [{ fieldName: 'name', ascending: true }]
+      recordType: 'Equipment',
+      resultsLimit: 200
     });
 
     const records = resp.records || [];
     records.forEach(r=>{
       const f = r.fields || {};
-      const name = f.name || '(no name)';
-      const sku = f.sku || '';
-      const total = f.total_quantity != null ? f.total_quantity : '';
-      const loc = f.location || '';
+      const nume = f.Nume ?? '';
+      const id   = f.Id ?? '';
+      const cant = f.Cantitate ?? '';
+      const gre  = f.Greutate ?? '';
+      const vol  = f.Volum ?? '';
 
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(name)}</td><td>${escapeHtml(sku)}</td><td>${escapeHtml(total)}</td><td>${escapeHtml(loc)}</td>`;
+      tr.innerHTML =
+        `<td>${escapeHtml(nume)}</td>`+
+        `<td>${escapeHtml(id)}</td>`+
+        `<td>${escapeHtml(cant)}</td>`+
+        `<td>${escapeHtml(gre)}</td>`+
+        `<td>${escapeHtml(vol)}</td>`;
       equipTableBody.appendChild(tr);
-
-      const opt = document.createElement('option');
-      opt.value = r.recordName;
-      opt.textContent = `${name} (${r.recordName})`;
-      equipSelect.appendChild(opt);
     });
   } catch (err){
     console.error(err);
-    alert('Failed to load equipment: ' + err);
+    alert('Eroare la încărcarea listei: ' + err);
   }
 }
 
