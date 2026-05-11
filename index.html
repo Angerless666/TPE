@@ -65,22 +65,18 @@
   </div>
 
 <script>
-/* CLOUDKIT CONNECTION INFO:
-   - containerIdentifier: your CloudKit container
-   - environment: 'development' (must match token)
-   - apiToken.name: API Token NAME from CloudKit Dashboard (NOT the secret key)
-*/
 const containerConfig = {
   containerIdentifier: 'iCloud.com.TPevents.inventory',
   environment: 'development',
   apiToken: {
     environment: 'development',
-    name: 'testconnection1'   // <-- API token NAME you created
+    name: 'testconnection1'
   }
 };
 
 CloudKit.configure({ containers: [containerConfig] });
 const container = CloudKit.getDefaultContainer();
+const db = container.publicCloudDatabase;
 
 /* UI refs */
 const signinBtn = document.getElementById('signinBtn');
@@ -111,11 +107,12 @@ function updateAuthUI(){
   }
 }
 
-/* Helper to create a record */
+/* Create one record using saveRecords */
 async function createRecord(recordType, fields){
-  const record = { recordType, fields };
-  const res = await container.publicCloudDatabase.save(record);
-  if(res && res.records && res.records.length) return res.records[0];
+  const res = await db.saveRecords({
+    records: [{ recordType, fields }]
+  });
+  if (res.records && res.records.length) return res.records[0];
   throw new Error('Create failed');
 }
 
@@ -154,7 +151,7 @@ createEquipForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* Allocate equipment to project */
+/* Allocate equipment */
 allocateForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -167,8 +164,8 @@ allocateForm.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Optional availability check
-    const fetched = await container.publicCloudDatabase.fetchRecords([equipSelection]);
+    // Availability check
+    const fetched = await db.fetchRecords({ recordNames: [equipSelection] });
     const eq = (fetched.records && fetched.records[0]) || null;
     if(eq && typeof eq.fields.total_quantity === 'number' && eq.fields.total_quantity < qty){
       if(!confirm('Quantity exceeds total_quantity. Proceed?')) return;
@@ -202,20 +199,24 @@ allocateForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* Load equipment list */
+/* Load equipment list using performQuery */
 async function loadEquipmentList(){
   try {
     equipTableBody.innerHTML = '';
     equipSelect.innerHTML = '';
 
-    const resp = await container.publicCloudDatabase.performQuery({ query: 'SELECT * FROM EquipmentModel' });
-    const records = resp.records || [];
+    const resp = await db.performQuery({
+      recordType: 'EquipmentModel',
+      sortBy: [{ fieldName: 'name', ascending: true }]
+    });
 
+    const records = resp.records || [];
     records.forEach(r=>{
-      const name = r.fields.name || '(no name)';
-      const sku = r.fields.sku || '';
-      const total = r.fields.total_quantity != null ? r.fields.total_quantity : '';
-      const loc = r.fields.location || '';
+      const f = r.fields || {};
+      const name = f.name || '(no name)';
+      const sku = f.sku || '';
+      const total = f.total_quantity != null ? f.total_quantity : '';
+      const loc = f.location || '';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `<td>${escapeHtml(name)}</td><td>${escapeHtml(sku)}</td><td>${escapeHtml(total)}</td><td>${escapeHtml(loc)}</td>`;
