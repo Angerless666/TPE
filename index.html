@@ -29,12 +29,6 @@
 
     <div id="connStatus" class="muted">Checking CloudKit connection…</div>
 
-    <div id="auth" class="card">
-      <button id="signinBtn">Sign In (optional)</button>
-      <button id="signoutBtn" style="display:none">Sign Out</button>
-      <span id="userInfo" class="muted"></span>
-    </div>
-
     <form id="createEquipForm" class="card">
       <h3>Create Equipment Model</h3>
       <label>Name</label><input id="eq_name" required />
@@ -76,7 +70,7 @@ const containerConfig = {
   environment: 'development',
   apiToken: {
     environment: 'development',
-    name: 'testconnection1'   // API Token NAME
+    name: 'testconnection1'
   }
 };
 
@@ -85,9 +79,6 @@ const container = CloudKit.getDefaultContainer();
 const db = container.publicCloudDatabase;
 
 /* UI refs */
-const signinBtn = document.getElementById('signinBtn');
-const signoutBtn = document.getElementById('signoutBtn');
-const userInfo = document.getElementById('userInfo');
 const connStatus = document.getElementById('connStatus');
 const createEquipForm = document.getElementById('createEquipForm');
 const allocateForm = document.getElementById('allocateForm');
@@ -95,7 +86,7 @@ const equipSelect = document.getElementById('equip_select');
 const equipTableBody = document.querySelector('#equipTable tbody');
 const refreshBtn = document.getElementById('refreshBtn');
 
-/* ---- CONNECTION TEST ---- */
+/* CONNECTION TEST */
 async function testConnection() {
   try {
     const result = await db.performQuery({
@@ -114,26 +105,7 @@ async function testConnection() {
   }
 }
 
-/* ---- AUTH (optional) ---- */
-signinBtn.addEventListener('click', async () => {
-  try { await container.signIn(); updateAuthUI(); } catch (e){ alert('Sign in failed: ' + e); }
-});
-signoutBtn.addEventListener('click', async () => { await container.signOut(); updateAuthUI(); });
-
-function updateAuthUI(){
-  if(container.getUserToken()){
-    signinBtn.style.display='none';
-    signoutBtn.style.display='inline-block';
-    const u = container.getUserInfo();
-    userInfo.textContent = u ? `Signed in: ${u.userRecordName}` : '';
-  } else {
-    signinBtn.style.display='inline-block';
-    signoutBtn.style.display='none';
-    userInfo.textContent = '';
-  }
-}
-
-/* ---- SAVE HELPER (uses saveRecords, not .save) ---- */
+/* SAVE HELPER */
 async function createRecord(recordType, fields){
   const res = await db.saveRecords({
     records: [{ recordType, fields }]
@@ -142,7 +114,7 @@ async function createRecord(recordType, fields){
   throw new Error('Create failed');
 }
 
-/* ---- CREATE EQUIPMENT MODEL ---- */
+/* CREATE EQUIPMENT MODEL */
 createEquipForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -166,7 +138,7 @@ createEquipForm.addEventListener('submit', async (e) => {
       entity_id: created.recordName,
       details: `Created equipment ${rec.name}`,
       timestamp: now,
-      user: container.getUserInfo() ? container.getUserInfo().userRecordName : null
+      user: null
     });
 
     alert('Created: ' + created.recordName);
@@ -177,7 +149,7 @@ createEquipForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* ---- ALLOCATE EQUIPMENT ---- */
+/* ALLOCATE EQUIPMENT */
 allocateForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -190,7 +162,6 @@ allocateForm.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Availability check
     const fetched = await db.fetchRecords({ recordNames: [equipSelection] });
     const eq = (fetched.records && fetched.records[0]) || null;
     if(eq && typeof eq.fields.total_quantity === 'number' && eq.fields.total_quantity < qty){
@@ -200,7 +171,7 @@ allocateForm.addEventListener('submit', async (e) => {
     const now = new Date().toISOString();
     const allocRec = {
       createdAt: now,
-      created_by: container.getUserInfo() ? container.getUserInfo().userRecordName : null,
+      created_by: null,
       equipment_model: { recordName: equipSelection },
       project: { recordName: projectId },
       quantity: qty,
@@ -215,7 +186,7 @@ allocateForm.addEventListener('submit', async (e) => {
       entity_id: created.recordName,
       details: `Allocated ${qty} of ${equipSelection} to ${projectId}`,
       timestamp: now,
-      user: container.getUserInfo() ? container.getUserInfo().userRecordName : null
+      user: null
     });
 
     alert('Allocation created: ' + created.recordName);
@@ -225,7 +196,7 @@ allocateForm.addEventListener('submit', async (e) => {
   }
 });
 
-/* ---- LOAD EQUIPMENT LIST ---- */
+/* LOAD EQUIPMENT LIST */
 async function loadEquipmentList(){
   try {
     equipTableBody.innerHTML = '';
@@ -267,10 +238,9 @@ function escapeHtml(s){
 
 refreshBtn.addEventListener('click', loadEquipmentList);
 
-/* ---- INIT ---- */
-updateAuthUI();
-testConnection();      // verify CloudKit connection on load
-loadEquipmentList();   // populate initial list
+/* INIT */
+testConnection();
+loadEquipmentList();
 </script>
 </body>
 </html>
