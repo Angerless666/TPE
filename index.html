@@ -1,0 +1,38 @@
+<div id="auth" class="card">
+  <button id="signinBtn">Sign In (optional)</button>
+  <button id="signoutBtn" style="display:none">Sign Out</button>
+  <span id="userInfo" class="muted"></span>
+</div>
+
+<form id="createEquipForm" class="card">
+  <h3>Create Equipment Model</h3>
+  <label>Name</label><input id="eq_name" required />
+  <label>Description</label><textarea id="eq_description"></textarea>
+  <div class="row">
+    <div class="col"><label>SKU</label><input id="eq_sku" /></div>
+    <div class="col"><label>Total Quantity</label><input id="eq_total" type="number" min="0" value="0" /></div>
+  </div>
+  <div class="row">
+    <div class="col"><label>Unit Weight (kg)</label><input id="eq_weight" type="number" step="any" /></div>
+    <div class="col"><label>Unit Volume (m3)</label><input id="eq_volume" type="number" step="any" /></div>
+  </div>
+  <label>Location</label><input id="eq_location" />
+  <button type="submit">Create Equipment</button>
+</form>
+
+<form id="allocateForm" class="card">
+  <h3>Allocate Equipment to Project</h3>
+  <label>Project Record Name/ID (Project._recordName)</label><input id="proj_id" required />
+  <label>Equipment Model</label><select id="equip_select"></select>
+  <label>Quantity</label><input id="alloc_qty" type="number" min="1" value="1" />
+  <button type="submit">Allocate</button>
+</form>
+
+<div class="card">
+  <h3>Equipment Models</h3>
+  <button id="refreshBtn">Refresh List</button>
+  <table id="equipTable">
+    <thead><tr><th>Name</th><th>SKU</th><th>Total</th><th>Location</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
