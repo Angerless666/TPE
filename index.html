@@ -64,14 +64,10 @@
   </div>
 
 <script>
-/* CLOUDKIT CONFIG */
+/* CLOUDKIT CONFIG – public, no token */
 const containerConfig = {
   containerIdentifier: 'iCloud.com.TPevents.inventory',
-  environment: 'development',
-  apiToken: {
-    environment: 'development',
-    name: 'testconnection1'
-  }
+  environment: 'development'
 };
 
 CloudKit.configure({ containers: [containerConfig] });
