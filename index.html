@@ -64,13 +64,18 @@
   </div>
 
 <script>
-/* CLOUDKIT CONFIG – public, no token */
-const containerConfig = {
-  containerIdentifier: 'iCloud.com.TPevents.inventory',
-  environment: 'development'
-};
+/* CLOUDKIT CONFIG: use API Access token string via apiTokenAuth.apiToken */
+CloudKit.configure({
+  containers: [{
+    containerIdentifier: 'iCloud.com.TPevents.inventory',
+    apiTokenAuth: {
+      apiToken: 'fd25015fd2080cc274066ae6b7c7e6cc7d5954e2c24f6f6d2d0a2a83deba51f6',
+      persist: true
+    },
+    environment: 'development'
+  }]
+});
 
-CloudKit.configure({ containers: [containerConfig] });
 const container = CloudKit.getDefaultContainer();
 const db = container.publicCloudDatabase;
 
